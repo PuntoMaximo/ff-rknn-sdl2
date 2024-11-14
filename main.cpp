@@ -133,8 +133,8 @@ const AVCodec* pOutputCodec = nullptr;
 AVCodec *codec;
 AVFrame *frame;
 AVPacket pkt;
-AVFrame* pFrameYUV;
 AVFrame* pFrameSDL;
+AVFrame* pFrameYUV;
 SwsContext* swsCtx;
 
 int screen_width = 1024;
@@ -305,14 +305,9 @@ static void displayTextureNV12(unsigned char *imageData)
 
     memcpy(texture_data, (unsigned char *)imageData, total_size);
 
-    // if (memcpy((unsigned char *)pFrameSDL->data[0], texture_data, total_size))
-    //     std::cout << "Textura copieada a pFrameSDL." << std::endl;
-
     SDL_UnlockTexture(texture);
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
-
-    // SDL_SetRenderTarget(renderer, captureTexture);
 
     // Draw Objects
     char text[256];
@@ -695,12 +690,7 @@ static int decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt)
             fprintf(stderr, "Error during decoding!\n");
             return ret;
         }
-        // if (frame->format != AV_PIX_FMT_NV12) {
-        //     fprintf(stderr, "Ouch... NV12 format only!\n");
-        //     return -1;
-        // }
 
-        // Convertir de formato de píxel al formato YUV420P necesario
         sws_scale(swsCtx, (const uint8_t* const*)frame->data, frame->linesize, 0, codec_ctx->height,
                   pFrameYUV->data, pFrameYUV->linesize);
 
@@ -708,15 +698,15 @@ static int decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt)
         pFrameYUV->pts = frame->pts;
         // pFrameSDL->pts = pFrameYUV->pts;
 
-        int ret = avcodec_send_frame(pOutCodecCtx, pFrameYUV);
-        if (ret >= 0) {
-            ret = avcodec_receive_packet(pOutCodecCtx, outpkt);
-            if (ret >= 0) {
-                outpkt->stream_index = pOutStream->index;
-                av_interleaved_write_frame(pOutputFormatCtx, outpkt);
-                av_packet_unref(outpkt);
-            }
-        }
+        // int ret = avcodec_send_frame(pOutCodecCtx, pFrameYUV);
+        // if (ret >= 0) {
+        //     ret = avcodec_receive_packet(pOutCodecCtx, outpkt);
+        //     if (ret >= 0) {
+        //         outpkt->stream_index = pOutStream->index;
+        //         av_interleaved_write_frame(pOutputFormatCtx, outpkt);
+        //         av_packet_unref(outpkt);
+        //     }
+        // }
 
         break;
     }
@@ -1170,10 +1160,10 @@ int main(int argc, char *argv[])
     window = SDL_CreateWindow("ff-rknn-v4l2-thread", screen_left, screen_top, screen_width, screen_height, wflags);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     if (window) {
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
         if (!renderer) {
             av_log(NULL, AV_LOG_WARNING, "Failed to initialize a hardware accelerated renderer: %s\n", SDL_GetError());
-            renderer = SDL_CreateRenderer(window, -1, 0);
+            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
         }
     }
     if (!window || !renderer) {
