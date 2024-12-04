@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(ffrknn-v2 LANGUAGES CXX)
+project(ffrknn-sdl2 LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -16,13 +16,13 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 --permissive -D_FILE_OFFSET_BITS=64 -DREENTRANT")
 
 include_directories(
-    /home/gabriel/BUILDROOT/buildroot/output/host/aarch64-buildroot-linux-gnu/include/c++/11.3.0/aarch64-buildroot-linux-gnu
-    /home/gabriel/BUILDROOT/buildroot/output/host/aarch64-buildroot-linux-gnu/include/c++/11.3.0
-    /home/gabriel/BUILDROOT/buildroot/output/target/usr/include/SDL2
-    /home/gabriel/BUILDROOT/buildroot/output/staging/usr/include/drm
+    ../../host/aarch64-buildroot-linux-gnu/include/c++/11.3.0/aarch64-buildroot-linux-gnu
+    ../../host/aarch64-buildroot-linux-gnu/include/c++/11.3.0
+    ../../target/usr/include/SDL2
+    ../../staging/usr/include/drm
 )
 
-set(SDL_FONTCACHE_LIBRARIES "/home/gabriel/BUILDROOT/buildroot/output/target/usr/lib/libSDL_FontCache.a")
+set(SDL_FONTCACHE_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/../../staging/usr/lib/libSDL_FontCache.a")
 
 # Comentado mientras se use otro metodo para llamar a las libs de FFMPEG
 # set(FFMPEG_LIBS
@@ -103,13 +103,13 @@ set(HEADERS
     postprocess.h
 )
 
-add_executable(ffrknn-v2
+add_executable(ffrknn-sdl2
     ${SOURCES}
     ${HEADERS}
 )
 
 # Linkear las librerías necesarias
-target_link_libraries(ffrknn-v2
+target_link_libraries(ffrknn-sdl2
     Qt${QT_VERSION_MAJOR}::Widgets
     ${FFMPEG_LIBRARIES}
     ${OTHER_LIBS}
@@ -122,3 +122,4 @@ target_link_libraries(ffrknn-v2
     pthread
 )
 
+install (TARGETS ffrknn-sdl2 DESTINATION bin)
