@@ -107,7 +107,7 @@ rknn_tensor_attr input_attrs[16];
 size_t actual_size = 0;
 const float nms_threshold = NMS_THRESH;
 const float box_conf_threshold = BOX_THRESH;
-char* labelsListFile = (char*)"/usr/share/coco_80_labels_list.txt";
+char* labelsListFile = (char*)"/usr/share/model/coco_80_labels_list.txt";
 /* --- SDL --- */
 int alphablend;
 int accur;
@@ -152,8 +152,8 @@ char *pixel_format;
 char *sensor_frame_size;
 char *sensor_frame_rate;
 
-int y_size = screen_width * screen_height;
-int uv_size = (screen_width * screen_height) / 2;
+int y_size = frame_width * frame_height;
+int uv_size = (frame_width * frame_height) / 2;
 
 double avg_inference_time = 0.0, inference_time = 0.0;
 float frmrate = 0.0;      // Measured frame rate
@@ -296,8 +296,8 @@ static void displayTextureNV12(unsigned char *imageData)
         prev_frmrate = frmrate;
     }
 
-    int y_size = screen_width * screen_height;
-    int uv_size = (screen_width * screen_height) / 2;
+    int y_size = frame_width * frame_height;
+    int uv_size = (frame_width * frame_height) / 2;
 
     int total_size = y_size + uv_size;
 
@@ -320,7 +320,7 @@ static void displayTextureNV12(unsigned char *imageData)
         detect_result_t *det_result = &(detect_result_group.results[i]);
 
         sprintf(text, "%s %.1f%%", det_result->name, det_result->prop * 100);
-#if 0
+
     printf("%s @ (%d %d %d %d) %f\n",
            det_result->name,
            det_result->box.left,
@@ -328,7 +328,7 @@ static void displayTextureNV12(unsigned char *imageData)
            det_result->box.right,
            det_result->box.bottom,
            det_result->prop);
-#endif
+
         if (obj2det) {
             obj = hash_me(det_result->name);
             if (obj != obj2det) {
@@ -628,12 +628,14 @@ static int inferenceThread(void *data)
     while (ret >= 0 && !*finished) {
         SDL_LockMutex(mutex);
         gettimeofday(&start_time, NULL);
-#if 1
-        inputs[0].buf = resize_buf;
-        rknn_inputs_set(ctx, io_num.n_input, inputs);
 
+        inputs[0].buf = resize_buf;
+
+        rknn_inputs_set(ctx, io_num.n_input, inputs);
         rknn_output outputs[io_num.n_output];
+
         memset(outputs, 0, sizeof(outputs));
+
         for (int i = 0; i < io_num.n_output; i++) {
             outputs[i].want_float = 0;
         }
@@ -642,8 +644,8 @@ static int inferenceThread(void *data)
         ret = rknn_outputs_get(ctx, io_num.n_output, outputs, NULL);
 
         // post process
-        scale_w = (float)width / codec_ctx->width;
-        scale_h = (float)height / codec_ctx->height;
+        scale_w = (float)width / screen_width;
+        scale_h = (float)height / screen_height;
 
         for (int i = 0; i < io_num.n_output; ++i) {
             out_scales.push_back(output_attrs[i].scale);
@@ -652,10 +654,10 @@ static int inferenceThread(void *data)
 
         post_process((int8_t *)outputs[0].buf, (int8_t *)outputs[1].buf, (int8_t *)outputs[2].buf,
                      height, width, box_conf_threshold, nms_threshold,
-                     scale_w, scale_h, out_zps, out_scales, &detect_result_group, labelsListFile);
+                     scale_w, scale_h, out_zps, out_scales, &detect_result_group);
 
         ret = rknn_outputs_release(ctx, io_num.n_output, outputs);
-#endif
+
         gettimeofday(&stop_time, NULL);
         inference_time = ((__get_us(stop_time) - __get_us(start_time)) / 1000);
         avg_inference_time = (avg_inference_time + inference_time) / 2.0;
@@ -733,7 +735,7 @@ static int decodeThread(void *data)
         }
         av_packet_unref(&pkt);
         /* ------------ RKNN ----------- */
-        src_format = RK_FORMAT_YCbCr_420_P;
+        src_format = RK_FORMAT_YCbCr_420_SP;
         dst_format = RK_FORMAT_BGR_888;
 
         fast_rga_buf(frame->width, frame->height, frame->width, frame->height, src_format, (char *)pFrameYUV->data[0], width, height,
@@ -965,7 +967,7 @@ int main(int argc, char *argv[])
             av_log(0, AV_LOG_ERROR, "Cannot find input format: v4l2\n");
             return -1;
         }
-        // input_ctx->flags |= AVFMT_FLAG_NONBLOCK;
+           input_ctx->flags |= AVFMT_FLAG_NONBLOCK;
         // input_ctx->flags |= AVFMT_FLAG_NOBUFFER;
         // input_ctx->flags |= AVFMT_FLAG_FLUSH_PACKETS;
         // input_ctx->flags |= AVFMT_FLAG_NOPARSE;
@@ -1073,37 +1075,6 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // // Configuración de salida de formato RTSP
-    // avformat_alloc_output_context2(&pOutputFormatCtx, NULL, "rtsp", "rtsp://10.42.0.1:8554/mystream");
-
-    // pOutputCodec = avcodec_find_encoder_by_name("h264_rkmpp");
-    // std::cout << "OUTPUT CODEC NAME: " << pOutputCodec->name << std::endl;
-    // pOutStream = avformat_new_stream(pOutputFormatCtx, pOutputCodec);
-    // pOutCodecCtx = avcodec_alloc_context3(pOutputCodec);
-
-    // std::cout << "CAMERA SENSOR SIZE: " << codec_ctx->width << "x" << codec_ctx->height << std::endl;
-
-    // pOutCodecCtx->width = codec_ctx->width;
-    // pOutCodecCtx->height = codec_ctx->height;
-    // pOutCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-    // pOutCodecCtx->time_base = {1, 30};
-
-    // avcodec_open2(pOutCodecCtx, pOutputCodec, NULL);
-
-    // avcodec_parameters_from_context(pOutStream->codecpar, pOutCodecCtx);
-
-    // if (!(pOutputFormatCtx->oformat->flags & AVFMT_NOFILE)) {
-    //     if (avio_open(&pOutputFormatCtx->pb, "rtsp://10.42.0.1:8554/mystream", AVIO_FLAG_WRITE) < 0) {
-    //         std::cerr << "No se puede abrir la URL de salida" << std::endl;
-    //         return -1;
-    //     }
-    // }
-
-    // if (avformat_write_header(pOutputFormatCtx, NULL) < 0) {
-    //     std::cerr << "Error al escribir la cabecera de formato de salida" << std::endl;
-    //     return -1;
-    // }
-
     pFrameYUV = av_frame_alloc();
     int numBytes = av_image_get_buffer_size(AV_PIX_FMT_YUV420P, codec_ctx->width, codec_ctx->height, 1);
     uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
@@ -1196,9 +1167,9 @@ int main(int argc, char *argv[])
         goto error_exit;
     }
 
-    FC_LoadFont(font_small, renderer, "fonts/Ubuntu-B.ttf", 16, FC_MakeColor(255, 255, 255, 255), TTF_STYLE_NORMAL);
-    FC_LoadFont(font_large, renderer, "fonts/Ubuntu-B.ttf", 26, FC_MakeColor(255, 255, 255, 155), TTF_STYLE_NORMAL);
-    FC_LoadFont(font_big, renderer, "fonts/Ubuntu-B.ttf", 72, FC_MakeColor(255, 55, 5, 255), TTF_STYLE_NORMAL);
+    FC_LoadFont(font_small, renderer, "/usr/share/fonts/liberation/LiberationMono-Bold.ttf", 16, FC_MakeColor(255, 255, 255, 255), TTF_STYLE_NORMAL);
+    FC_LoadFont(font_large, renderer, "/usr/share/fonts/liberation/LiberationMono-Bold.ttf", 26, FC_MakeColor(255, 255, 255, 155), TTF_STYLE_NORMAL);
+    FC_LoadFont(font_big, renderer, "/usr/share/fonts/liberation/LiberationMono-Bold.ttf", 72, FC_MakeColor(255, 55, 5, 255), TTF_STYLE_NORMAL);
 
     rect.x = 0;
     rect.y = 0;
